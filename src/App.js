@@ -18,6 +18,7 @@ const useStyles = makeStyles(theme => ({
     display: "flex",
     flexDirection: "column",
     height: "100vh",
+    overflow: "hidden",
   },
   menuButton: {
     marginRight: theme.spacing(2),
@@ -44,6 +45,7 @@ const TabPanel = props => {
     <Typography
       component="div"
       role="tabpanel"
+      style={{ overflowY: "scroll", height: "91vh" }}
       hidden={value !== index}
       id={`vertical-tabpanel-${index}`}
       aria-labelledby={`vertical-tab-${index}`}
@@ -60,18 +62,18 @@ const StyledAppBar = withStyles({
 })(AppBar);
 
 const defaultInputs = {
-  appraisal: null,
-  originalPrincipal: null,
-  originalRate: null,
-  originalTerm: null,
-  originalPMI: null,
-  currentPayment: null,
-  currentBalance: null,
-  closingCosts: null,
-  newRate: null,
-  newTerm: null,
-  newPMI: null,
-  cashOut: null,
+  appraisal: "100000",
+  originalPrincipal: "100000",
+  originalRate: "4.5",
+  originalTerm: "360",
+  originalPMI: "1000",
+  currentPayment: "600",
+  currentBalance: "80000",
+  closingCosts: "",
+  newRate: "",
+  newTerm: "",
+  newPMI: "",
+  cashOut: "",
 };
 
 const App = () => {

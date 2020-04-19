@@ -30,11 +30,19 @@ const cumulativeInterest = (P, I, N, B, E) => {
   const Q = 12;
   const M = payment(P, I, N, Q);
   return (
-    (P - (M * Q) / I) * (1 + I / Q) ** (B - 1) +
-    (M * Q) / I -
-    ((P - (M * Q) / I) * (1 + I / Q) ** E + (M * Q) / I) -
-    M * (E - B + 1)
+    roundMoney(
+      (P - (M * Q) / I) * (1 + I / Q) ** (B - 1) +
+        (M * Q) / I -
+        ((P - (M * Q) / I) * (1 + I / Q) ** E + (M * Q) / I) -
+        M * (E - B + 1),
+    ) || ""
   );
+};
+
+const nper = (rate, payment, present) => {
+  const num = payment;
+  const den = present * rate + payment;
+  return roundMoney(Math.log(num / den) / Math.log(1 + rate)) || "";
 };
 
 const MoneyFormat = props => {
@@ -85,7 +93,7 @@ const DefaultInput = props => {
     ? { inputComponent: PercentFormat }
     : props.money
     ? { inputComponent: MoneyFormat }
-    : {};
+    : null;
   const hold = props.percent ? "0%" : props.money ? "$0" : props.placeholder;
   return (
     <TextField
@@ -114,21 +122,103 @@ const StyledInput = withStyles({
   },
 })(DefaultInput);
 
-const minimumPayment = inputs => {
-  return (
-    Math.round(
-      (finance.AM(
-        inputs.originalPrincipal,
-        inputs.originalRate,
-        inputs.originalTerm,
-        1,
-      ) +
-        (inputs.originalPrincipal >= inputs.appraisal * 0.8
-          ? inputs.originalPMI / 12
-          : 0)) *
-        100,
-    ) / 100
+const roundMoney = money => {
+  return Math.round(money * 100) / 100;
+};
+
+const minimumPayment = (inputs, refi) => {
+  const op = toFloatSafe(
+    refi ? newPrincipal(inputs) : inputs.originalPrincipal,
   );
+  const rate = toFloatSafe(refi ? inputs.newRate : inputs.originalRate);
+  const term = toFloatSafe(refi ? inputs.newTerm : inputs.originalTerm);
+  const pmi = toFloatSafe(refi ? inputs.newPMI : inputs.originalPMI);
+  return (
+    roundMoney(
+      finance.AM(op, rate, term, 1) +
+        (op >= toFloatSafe(inputs.appraisal) * 0.8 ? pmi / 12 : 0),
+    ) || ""
+  );
+};
+
+const toFloatSafe = n => parseFloat(n) || 0;
+
+const newPrincipal = ({ currentBalance, cashOut, closingCosts }) => {
+  return (
+    toFloatSafe(currentBalance) +
+    toFloatSafe(cashOut) +
+    toFloatSafe(closingCosts)
+  );
+};
+
+const allNPER = inputs => {
+  const cmmp = minimumPayment(inputs);
+  const adj =
+    toFloatSafe(inputs.originalPrincipal) >= toFloatSafe(inputs.appraisal) * 0.8
+      ? toFloatSafe(inputs.originalPMI) / 12
+      : 0;
+  // CM
+  const cm = nper(
+    parseFloat(inputs.originalRate) / 1200,
+    cmmp - adj,
+    -parseFloat(inputs.currentBalance),
+  );
+  // CM w/ Additional
+  const cmwa = nper(
+    parseFloat(inputs.originalRate) / 1200,
+    parseFloat(inputs.currentPayment) - adj,
+    -parseFloat(inputs.currentBalance),
+  );
+  // ReFi
+
+  const np = newPrincipal(inputs);
+  const refimp = minimumPayment(inputs, 1);
+
+  const refi = nper(parseFloat(inputs.newRate) / 1200, refimp, -np);
+  // ReFi w/ Additional
+  const refiwa = nper(parseFloat(inputs.originalRate) / 1200, refimp, -np);
+
+  return { cm, cmwa, refi, refiwa, cmmp, refimp };
+};
+
+const allCUMIPMT = (inputs, { cm, cmwa, refi, refiwa }) => {
+  // CM
+  const cmip = -cumulativeInterest(
+    toFloatSafe(inputs.currentBalance),
+    toFloatSafe(inputs.originalRate) / 100,
+    cm,
+    1,
+    cm,
+  );
+
+  // CM w/ Additional
+  const cmwaip = -cumulativeInterest(
+    toFloatSafe(inputs.currentBalance),
+    toFloatSafe(inputs.originalRate) / 100,
+    cmwa,
+    1,
+    cmwa,
+  );
+
+  const np = newPrincipal(inputs);
+  // ReFi
+  const refiip = -cumulativeInterest(
+    np,
+    toFloatSafe(inputs.newRate) / 100,
+    refi,
+    1,
+    refi,
+  );
+  // ReFi w/ Additional
+  const refiwaip = -cumulativeInterest(
+    np,
+    toFloatSafe(inputs.newRate) / 100,
+    refiwa,
+    1,
+    refiwa,
+  );
+
+  return { cmip, cmwaip, refiip, refiwaip };
 };
 
 const Inputs = ({ inputs, onChange }) => {
@@ -144,6 +234,14 @@ const Inputs = ({ inputs, onChange }) => {
       [panel]: isExpanded,
     });
   };
+
+  const remainingMonths = allNPER(inputs);
+  const { cm, cmwa, refi, refiwa, cmmp, refimp } = remainingMonths;
+
+  const { cmip, cmwaip, refiip, refiwaip } = allCUMIPMT(
+    inputs,
+    remainingMonths,
+  );
 
   const classes = useStyles();
   return (
@@ -166,7 +264,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.appraisal}
                 onChange={onChange("appraisal")}
                 label="Appraisal"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -174,7 +272,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.originalPrincipal}
                 onChange={onChange("originalPrincipal")}
                 label="Original Principal"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -182,7 +280,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.originalRate}
                 onChange={onChange("originalRate")}
                 label="Rate"
-                percent
+                percent={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -197,7 +295,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.originalPMI}
                 onChange={onChange("originalPMI")}
                 label="PMI/MIP"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -205,7 +303,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.currentPayment}
                 onChange={onChange("currentPayment")}
                 label="Current Payment"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -213,23 +311,23 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.currentBalance}
                 onChange={onChange("currentBalance")}
                 label="Current Balance"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3} />
             <Grid item sm={3}>
               <StyledInput
                 disabled
-                money
-                value={minimumPayment(inputs)}
+                money={1}
+                value={cmmp}
                 label="Minimum Payment"
               />
             </Grid>
             <Grid item sm={3}>
               <StyledInput
                 disabled
-                money
-                value={inputs.currentPayment - minimumPayment(inputs)}
+                money={1}
+                value={roundMoney(inputs.currentPayment - cmmp)}
                 label="Additional Payment"
               />
             </Grid>
@@ -252,7 +350,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.closingCosts}
                 onChange={onChange("closingCosts")}
                 label="Closing Costs"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -260,7 +358,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.newRate}
                 onChange={onChange("newRate")}
                 label="Rate"
-                percent
+                percent={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -275,7 +373,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.newPMI}
                 onChange={onChange("newPMI")}
                 label="PMI/MIP"
-                money
+                money={1}
               />
             </Grid>
             <Grid item sm={3}>
@@ -283,7 +381,7 @@ const Inputs = ({ inputs, onChange }) => {
                 value={inputs.cashOut}
                 onChange={onChange("cashOut")}
                 label="Cash Out"
-                money
+                money={1}
               />
             </Grid>
           </Grid>
@@ -298,17 +396,41 @@ const Inputs = ({ inputs, onChange }) => {
         <ExpansionPanelDetails>
           <Grid container spacing={2}>
             <Grid item sm={3}>
-              <DefaultInput label="CM - Remaining Months" />
+              <DefaultInput value={cm} label="CM - Remaining Months" />
             </Grid>
             <Grid item sm={3}>
-              <DefaultInput label="CM - Total Interest" />
-            </Grid>
-            <Grid item sm={6} />
-            <Grid item sm={3}>
-              <DefaultInput label="Term (months)" />
+              <DefaultInput value={cmip} label="CM - Total Interest" />
             </Grid>
             <Grid item sm={3}>
-              <DefaultInput label="PMI/MIP" />
+              <DefaultInput
+                value={cmwa}
+                label="CM w/ Additions - Remaining Months"
+              />
+            </Grid>
+            <Grid item sm={3}>
+              <DefaultInput
+                value={cmwaip}
+                label="CM w/ Additions - Total Interest"
+              />
+            </Grid>
+
+            <Grid item sm={3}>
+              <DefaultInput value={refi} label="ReFi- Remaining Months" />
+            </Grid>
+            <Grid item sm={3}>
+              <DefaultInput value={refiip} label="ReFi - Total Interest" />
+            </Grid>
+            <Grid item sm={3}>
+              <DefaultInput
+                value={refiwa}
+                label="ReFi w/ Additions - Remaining Months"
+              />
+            </Grid>
+            <Grid item sm={3}>
+              <DefaultInput
+                value={refiwaip}
+                label="Refi w/ Additions - Total Interest"
+              />
             </Grid>
           </Grid>
         </ExpansionPanelDetails>
