@@ -6,6 +6,8 @@ import ExpansionPanel from "@material-ui/core/ExpansionPanel";
 import ExpansionPanelSummary from "@material-ui/core/ExpansionPanelSummary";
 import ExpansionPanelDetails from "@material-ui/core/ExpansionPanelDetails";
 import Typography from "@material-ui/core/Typography";
+import Card from "@material-ui/core/Card";
+import CardContent from "@material-ui/core/CardContent";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import NumberFormat from "react-number-format";
 import Finance from "financejs";
@@ -62,7 +64,7 @@ const MoneyFormat = props => {
       }}
       thousandSeparator
       isNumericString
-      prefix="$"
+      prefix="$ "
     />
   );
 };
@@ -153,35 +155,50 @@ const newPrincipal = ({ currentBalance, cashOut, closingCosts }) => {
 
 const allNPER = inputs => {
   const cmmp = minimumPayment(inputs);
+  const originalTerm = toFloatSafe(inputs.originalTerm);
+  const validCM = term => Math.min(term, originalTerm);
   const adj =
     toFloatSafe(inputs.originalPrincipal) >= toFloatSafe(inputs.appraisal) * 0.8
       ? toFloatSafe(inputs.originalPMI) / 12
       : 0;
   // CM
-  const cm = nper(
-    parseFloat(inputs.originalRate) / 1200,
-    cmmp - adj,
-    -parseFloat(inputs.currentBalance),
+  const cm = validCM(
+    nper(
+      parseFloat(inputs.originalRate) / 1200,
+      cmmp - adj,
+      -parseFloat(inputs.currentBalance),
+    ),
   );
   // CM w/ Additional
-  const cmwa = nper(
-    parseFloat(inputs.originalRate) / 1200,
-    parseFloat(inputs.currentPayment) - adj,
-    -parseFloat(inputs.currentBalance),
+  const cmwa = validCM(
+    nper(
+      parseFloat(inputs.originalRate) / 1200,
+      parseFloat(inputs.currentPayment) - adj,
+      -parseFloat(inputs.currentBalance),
+    ),
   );
   // ReFi
 
   const np = newPrincipal(inputs);
   const refimp = minimumPayment(inputs, 1);
-
-  const refi = nper(parseFloat(inputs.newRate) / 1200, refimp, -np);
+  const refiadj =
+    np >= toFloatSafe(inputs.appraisal) * 0.8
+      ? toFloatSafe(inputs.newPMI) / 12
+      : 0;
+  const newTerm = parseFloat(inputs.newTerm);
+  const validREFI = term => Math.min(newTerm, term);
+  const refi = validREFI(
+    nper(parseFloat(inputs.newRate) / 1200, refimp - refiadj, -np),
+  );
   // ReFi w/ Additional
-  const refiwa = nper(parseFloat(inputs.originalRate) / 1200, refimp, -np);
+  const refiwa = validREFI(
+    nper(parseFloat(inputs.newRate) / 1200, refimp - refiadj, -np),
+  );
 
-  return { cm, cmwa, refi, refiwa, cmmp, refimp };
+  return { cm, cmwa, refi, refiwa, cmmp, refimp, np };
 };
 
-const allCUMIPMT = (inputs, { cm, cmwa, refi, refiwa }) => {
+const allCUMIPMT = (inputs, { cm, cmwa, refi, refiwa, np }) => {
   // CM
   const cmip = -cumulativeInterest(
     toFloatSafe(inputs.currentBalance),
@@ -200,7 +217,6 @@ const allCUMIPMT = (inputs, { cm, cmwa, refi, refiwa }) => {
     cmwa,
   );
 
-  const np = newPrincipal(inputs);
   // ReFi
   const refiip = -cumulativeInterest(
     np,
@@ -221,6 +237,35 @@ const allCUMIPMT = (inputs, { cm, cmwa, refi, refiwa }) => {
   return { cmip, cmwaip, refiip, refiwaip };
 };
 
+const useCardStyles = makeStyles(theme => ({
+  card: {
+    backgroundColor: "#78909c",
+  },
+  content: {
+    padding: theme.spacing(1),
+    paddingBottom: theme.spacing(1) + "px !important",
+  },
+  header: {
+    color: "white",
+    fontSize: "10px",
+  },
+  text: {
+    color: "white",
+  },
+}));
+
+const CalculatedNumber = ({ title, value }) => {
+  const classes = useCardStyles();
+  return (
+    <Card className={classes.card}>
+      <CardContent className={classes.content}>
+        <Typography className={classes.header}>{title}</Typography>
+        <Typography className={classes.text}>{value}</Typography>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Inputs = ({ inputs, onChange }) => {
   const [panels, setPanels] = React.useState({
     original: true,
@@ -236,13 +281,13 @@ const Inputs = ({ inputs, onChange }) => {
   };
 
   const remainingMonths = allNPER(inputs);
-  const { cm, cmwa, refi, refiwa, cmmp, refimp } = remainingMonths;
+  const { cm, cmwa, refi, refiwa, cmmp, refimp, np } = remainingMonths;
 
   const { cmip, cmwaip, refiip, refiwaip } = allCUMIPMT(
     inputs,
     remainingMonths,
   );
-
+  const pp = Math.max(refimp, toFloatSafe(inputs.currentPayment));
   const classes = useStyles();
   return (
     <div>
@@ -259,7 +304,7 @@ const Inputs = ({ inputs, onChange }) => {
         </ExpansionPanelSummary>
         <ExpansionPanelDetails>
           <Grid container spacing={2}>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.appraisal}
                 onChange={onChange("appraisal")}
@@ -267,7 +312,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.originalPrincipal}
                 onChange={onChange("originalPrincipal")}
@@ -275,7 +320,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={1}>
               <StyledInput
                 value={inputs.originalRate}
                 onChange={onChange("originalRate")}
@@ -283,14 +328,14 @@ const Inputs = ({ inputs, onChange }) => {
                 percent={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={1}>
               <StyledInput
                 value={inputs.originalTerm}
                 onChange={onChange("originalTerm")}
-                label="Term (months)"
+                label="Term (m)"
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.originalPMI}
                 onChange={onChange("originalPMI")}
@@ -298,7 +343,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.currentPayment}
                 onChange={onChange("currentPayment")}
@@ -306,7 +351,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.currentBalance}
                 onChange={onChange("currentBalance")}
@@ -314,21 +359,30 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3} />
-            <Grid item sm={3}>
-              <StyledInput
-                disabled
-                money={1}
-                value={cmmp}
-                label="Minimum Payment"
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="Minimum Payment"
+                value={
+                  <NumberFormat
+                    value={cmmp || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
-            <Grid item sm={3}>
-              <StyledInput
-                disabled
-                money={1}
-                value={roundMoney(inputs.currentPayment - cmmp)}
-                label="Additional Payment"
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="Additional Payment"
+                value={
+                  <NumberFormat
+                    value={roundMoney(inputs.currentPayment - cmmp) || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
           </Grid>
@@ -345,7 +399,7 @@ const Inputs = ({ inputs, onChange }) => {
         </ExpansionPanelSummary>
         <ExpansionPanelDetails>
           <Grid container spacing={2}>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.closingCosts}
                 onChange={onChange("closingCosts")}
@@ -353,7 +407,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.newRate}
                 onChange={onChange("newRate")}
@@ -361,14 +415,14 @@ const Inputs = ({ inputs, onChange }) => {
                 percent={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.newTerm}
                 onChange={onChange("newTerm")}
                 label="Term (months)"
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.newPMI}
                 onChange={onChange("newPMI")}
@@ -376,12 +430,65 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={3}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.cashOut}
                 onChange={onChange("cashOut")}
                 label="Cash Out"
                 money={1}
+              />
+            </Grid>
+            <Grid item sm={2} />
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="New Principal"
+                value={
+                  <NumberFormat
+                    value={np || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="Minimum Payment"
+                value={
+                  <NumberFormat
+                    value={refimp || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="Planned Payment"
+                value={
+                  <NumberFormat
+                    value={pp || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+            <Grid item sm={2}>
+              <CalculatedNumber
+                title="Additional Payment"
+                value={
+                  <NumberFormat
+                    value={roundMoney(pp - refimp) || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
           </Grid>

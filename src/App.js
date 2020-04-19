@@ -69,11 +69,11 @@ const defaultInputs = {
   originalPMI: "1000",
   currentPayment: "600",
   currentBalance: "80000",
-  closingCosts: "",
-  newRate: "",
-  newTerm: "",
-  newPMI: "",
-  cashOut: "",
+  closingCosts: "10000",
+  newRate: "2.5",
+  newTerm: "360",
+  newPMI: "9000",
+  cashOut: "5000",
 };
 
 const App = () => {
