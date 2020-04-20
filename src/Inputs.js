@@ -9,10 +9,16 @@ import Typography from "@material-ui/core/Typography";
 import Card from "@material-ui/core/Card";
 import CardContent from "@material-ui/core/CardContent";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ArrowForwardIcon from "@material-ui/icons/ArrowForward";
 import NumberFormat from "react-number-format";
-import Finance from "financejs";
-
-const finance = new Finance();
+import {
+  cumulativeInterest,
+  nper,
+  roundMoney,
+  minimumPayment,
+  toFloatSafe,
+  newPrincipal,
+} from "./finance";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -22,30 +28,12 @@ const useStyles = makeStyles(theme => ({
     fontSize: theme.typography.pxToRem(15),
     fontWeight: theme.typography.fontWeightRegular,
   },
+  arrow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 }));
-
-const payment = (P, I, N, Q) => {
-  return P * (I / Q / (1 - (1 + I / Q) ** -N));
-};
-
-const cumulativeInterest = (P, I, N, B, E) => {
-  const Q = 12;
-  const M = payment(P, I, N, Q);
-  return (
-    roundMoney(
-      (P - (M * Q) / I) * (1 + I / Q) ** (B - 1) +
-        (M * Q) / I -
-        ((P - (M * Q) / I) * (1 + I / Q) ** E + (M * Q) / I) -
-        M * (E - B + 1),
-    ) || ""
-  );
-};
-
-const nper = (rate, payment, present) => {
-  const num = payment;
-  const den = present * rate + payment;
-  return roundMoney(Math.log(num / den) / Math.log(1 + rate)) || "";
-};
 
 const MoneyFormat = props => {
   const { inputRef, onChange, ...other } = props;
@@ -123,35 +111,6 @@ const StyledInput = withStyles({
     },
   },
 })(DefaultInput);
-
-const roundMoney = money => {
-  return Math.round(money * 100) / 100;
-};
-
-const minimumPayment = (inputs, refi) => {
-  const op = toFloatSafe(
-    refi ? newPrincipal(inputs) : inputs.originalPrincipal,
-  );
-  const rate = toFloatSafe(refi ? inputs.newRate : inputs.originalRate);
-  const term = toFloatSafe(refi ? inputs.newTerm : inputs.originalTerm);
-  const pmi = toFloatSafe(refi ? inputs.newPMI : inputs.originalPMI);
-  return (
-    roundMoney(
-      finance.AM(op, rate, term, 1) +
-        (op >= toFloatSafe(inputs.appraisal) * 0.8 ? pmi / 12 : 0),
-    ) || ""
-  );
-};
-
-const toFloatSafe = n => parseFloat(n) || 0;
-
-const newPrincipal = ({ currentBalance, cashOut, closingCosts }) => {
-  return (
-    toFloatSafe(currentBalance) +
-    toFloatSafe(cashOut) +
-    toFloatSafe(closingCosts)
-  );
-};
 
 const allNPER = inputs => {
   const cmmp = minimumPayment(inputs);
@@ -261,6 +220,44 @@ const CalculatedNumber = ({ title, value }) => {
       <CardContent className={classes.content}>
         <Typography className={classes.header}>{title}</Typography>
         <Typography className={classes.text}>{value}</Typography>
+      </CardContent>
+    </Card>
+  );
+};
+
+const useTotalsStyles = makeStyles(theme => ({
+  card: {
+    backgroundColor: "#78909c",
+  },
+  content: {
+    padding: theme.spacing(1),
+    paddingBottom: theme.spacing(1) + "px !important",
+  },
+  header: {
+    color: "white",
+    fontSize: "10px",
+  },
+  text: {
+    color: "white",
+  },
+  bigHeader: {
+    color: "white",
+    fontSize: "15px",
+  },
+}));
+
+const TotalsBoxes = ({ titleA, valueA, titleB, valueB, bigTitle }) => {
+  const classes = useTotalsStyles();
+  return (
+    <Card className={classes.card}>
+      <CardContent className={classes.content}>
+        <Typography className={classes.bigHeader}>
+          <strong>{bigTitle}</strong>
+        </Typography>
+        <Typography className={classes.header}>{titleA}</Typography>
+        <Typography className={classes.text}>{valueA}</Typography>
+        <Typography className={classes.header}>{titleB}</Typography>
+        <Typography className={classes.text}>{valueB}</Typography>
       </CardContent>
     </Card>
   );
@@ -502,41 +499,131 @@ const Inputs = ({ inputs, onChange }) => {
         </ExpansionPanelSummary>
         <ExpansionPanelDetails>
           <Grid container spacing={2}>
-            <Grid item sm={3}>
-              <DefaultInput value={cm} label="CM - Remaining Months" />
-            </Grid>
-            <Grid item sm={3}>
-              <DefaultInput value={cmip} label="CM - Total Interest" />
-            </Grid>
-            <Grid item sm={3}>
-              <DefaultInput
-                value={cmwa}
-                label="CM w/ Additions - Remaining Months"
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Current Mortgage"
+                titleA="Remaining Months"
+                valueA={<NumberFormat value={cm || "-"} displayType="text" />}
+                titleB="Total Interest"
+                valueB={
+                  <NumberFormat
+                    value={cmip || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
-            <Grid item sm={3}>
-              <DefaultInput
-                value={cmwaip}
-                label="CM w/ Additions - Total Interest"
+            <Grid item sm={1} className={classes.arrow}>
+              <ArrowForwardIcon fontSize="large" />
+            </Grid>
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Refinance"
+                titleA="Remaining Months"
+                valueA={<NumberFormat value={refi || "-"} displayType="text" />}
+                titleB="Total Interest"
+                valueB={
+                  <NumberFormat
+                    value={refiip || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
 
-            <Grid item sm={3}>
-              <DefaultInput value={refi} label="ReFi- Remaining Months" />
+            <Grid item sm={1} className={classes.arrow}>
+              <ArrowForwardIcon fontSize="large" />
             </Grid>
-            <Grid item sm={3}>
-              <DefaultInput value={refiip} label="ReFi - Total Interest" />
-            </Grid>
-            <Grid item sm={3}>
-              <DefaultInput
-                value={refiwa}
-                label="ReFi w/ Additions - Remaining Months"
+
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Normal Impact"
+                titleA={`Months ${cm > refi ? "faster" : "slower"}`}
+                valueA={
+                  <NumberFormat
+                    value={Math.abs(cm - refi) || "-"}
+                    displayType="text"
+                  />
+                }
+                titleB={`${cmip > refiip ? "Less" : "More"} Interest Paid`}
+                valueB={
+                  <NumberFormat
+                    value={Math.abs(roundMoney(cmip - refiip)) || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
-            <Grid item sm={3}>
-              <DefaultInput
-                value={refiwaip}
-                label="Refi w/ Additions - Total Interest"
+
+            <Grid item sm={4} />
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Current Mortgage w/ Add. Payment"
+                titleA="Remaining Months"
+                valueA={<NumberFormat value={cmwa || "-"} displayType="text" />}
+                titleB="Total Interest"
+                valueB={
+                  <NumberFormat
+                    value={cmwaip || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+
+            <Grid item sm={1} className={classes.arrow}>
+              <ArrowForwardIcon fontSize="large" />
+            </Grid>
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Refinance w/ Add. Payment"
+                titleA="Remaining Months"
+                valueA={
+                  <NumberFormat value={refiwa || "-"} displayType="text" />
+                }
+                titleB="Total Interest"
+                valueB={
+                  <NumberFormat
+                    value={refiwaip || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+
+            <Grid item sm={1} className={classes.arrow}>
+              <ArrowForwardIcon fontSize="large" />
+            </Grid>
+
+            <Grid item sm={2}>
+              <TotalsBoxes
+                bigTitle="Additional Payment Impact"
+                titleA={`Months ${cmwa > refiwa ? "Faster" : "Slower"}`}
+                valueA={
+                  <NumberFormat
+                    value={Math.abs(cmwa - refiwa) || "-"}
+                    displayType="text"
+                  />
+                }
+                titleB={`${cmwaip > refiip ? "Less" : "More"} Interest Paid`}
+                valueB={
+                  <NumberFormat
+                    value={Math.abs(roundMoney(cmwaip - refiip)) || "-"}
+                    displayType="text"
+                    thousandSeparator={true}
+                    prefix="$ "
+                  />
+                }
               />
             </Grid>
           </Grid>
