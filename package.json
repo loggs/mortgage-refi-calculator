@@ -13,7 +13,8 @@
     "react-dom": "^16.13.1",
     "react-number-format": "^4.4.1",
     "react-scripts": "3.4.1",
-    "react-virtualized": "^9.21.2"
+    "react-virtualized": "^9.21.2",
+    "recharts": "^1.8.5"
   },
   "scripts": {
     "start": "react-scripts start",

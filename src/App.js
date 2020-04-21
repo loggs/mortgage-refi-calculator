@@ -11,6 +11,7 @@ import Tab from "@material-ui/core/Tab";
 import Box from "@material-ui/core/Box";
 
 import Inputs from "./Inputs";
+import Graphs from "./Graphs";
 import AmortizationTable from "./AmortizationTable";
 
 const useStyles = makeStyles(theme => ({
@@ -125,7 +126,7 @@ const App = () => {
           <Inputs inputs={inputs} onChange={onInputChange} />
         </TabPanel>
         <TabPanel className={classes.panel} value={value} index={1}>
-          Graphs
+          <Graphs inputs={inputs} />
         </TabPanel>
         <TabPanel className={classes.panel} value={value} index={2}>
           <AmortizationTable inputs={inputs} />
