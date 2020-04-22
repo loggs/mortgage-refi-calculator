@@ -82,7 +82,7 @@ export const generateAmortizationTable = (
     interest = roundMoney((cb * rate) / 12);
     pmipmt = roundMoney(cb >= 0.8 * appraisal ? pmi / 12 : 0);
     pay = roundMoney(
-      Math.min(payment - (cb >= 0.8 * appraisal ? 0 : pmi / 12), cb + interest),
+      Math.min(payment - (cb >= 0.8 * appraisal ? pmi / 12 : 0), cb + interest),
     );
     ppmt = roundMoney(pay - interest - pmipmt);
     table.push({ month: i + 1, cb, interest, pay, pmipmt, ppmt });
