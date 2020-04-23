@@ -2,7 +2,7 @@ import React from "react";
 import Grid from "@material-ui/core/Grid";
 import TextField from "@material-ui/core/TextField";
 import { makeStyles, withStyles } from "@material-ui/core/styles";
-import ExpansionPanel from "@material-ui/core/ExpansionPanel";
+import MuiExpansionPanel from "@material-ui/core/ExpansionPanel";
 import ExpansionPanelSummary from "@material-ui/core/ExpansionPanelSummary";
 import ExpansionPanelDetails from "@material-ui/core/ExpansionPanelDetails";
 import Typography from "@material-ui/core/Typography";
@@ -19,6 +19,23 @@ import {
   toFloatSafe,
   newPrincipal,
 } from "./finance";
+
+const ExpansionPanel = withStyles({
+  root: {
+    border: "1px solid rgba(0, 0, 0, .125)",
+    boxShadow: "none",
+    "&:not(:last-child)": {
+      borderBottom: 0,
+    },
+    "&:before": {
+      display: "none",
+    },
+    "&$expanded": {
+      margin: "auto",
+    },
+  },
+  expanded: {},
+})(MuiExpansionPanel);
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -317,7 +334,7 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={1}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.originalRate}
                 onChange={onChange("originalRate")}
@@ -325,11 +342,11 @@ const Inputs = ({ inputs, onChange }) => {
                 percent={1}
               />
             </Grid>
-            <Grid item sm={1}>
+            <Grid item sm={2}>
               <StyledInput
                 value={inputs.originalTerm}
                 onChange={onChange("originalTerm")}
-                label="Term (m)"
+                label="Term (months)"
               />
             </Grid>
             <Grid item sm={2}>
@@ -340,6 +357,8 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
+
+            <Grid item sm={2} />
             <Grid item sm={2}>
               <StyledInput
                 value={inputs.currentPayment}
@@ -356,12 +375,13 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
+            <Grid item sm={8} />
             <Grid item sm={2}>
               <CalculatedNumber
                 title="Minimum Payment"
                 value={
                   <NumberFormat
-                    value={cmmp || "-"}
+                    value={roundMoney(cmmp) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -441,7 +461,7 @@ const Inputs = ({ inputs, onChange }) => {
                 title="New Principal"
                 value={
                   <NumberFormat
-                    value={np || "-"}
+                    value={roundMoney(np) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -454,7 +474,7 @@ const Inputs = ({ inputs, onChange }) => {
                 title="Minimum Payment"
                 value={
                   <NumberFormat
-                    value={refimp || "-"}
+                    value={roundMoney(refimp) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -467,7 +487,7 @@ const Inputs = ({ inputs, onChange }) => {
                 title="Planned Payment"
                 value={
                   <NumberFormat
-                    value={pp || "-"}
+                    value={roundMoney(pp) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -503,11 +523,16 @@ const Inputs = ({ inputs, onChange }) => {
               <TotalsBoxes
                 bigTitle="Current Mortgage"
                 titleA="Remaining Months"
-                valueA={<NumberFormat value={cm || "-"} displayType="text" />}
+                valueA={
+                  <NumberFormat
+                    value={roundMoney(cm) || "-"}
+                    displayType="text"
+                  />
+                }
                 titleB="Total Interest"
                 valueB={
                   <NumberFormat
-                    value={cmip || "-"}
+                    value={roundMoney(cmip) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -522,11 +547,16 @@ const Inputs = ({ inputs, onChange }) => {
               <TotalsBoxes
                 bigTitle="Refinance"
                 titleA="Remaining Months"
-                valueA={<NumberFormat value={refi || "-"} displayType="text" />}
+                valueA={
+                  <NumberFormat
+                    value={roundMoney(refi) || "-"}
+                    displayType="text"
+                  />
+                }
                 titleB="Total Interest"
                 valueB={
                   <NumberFormat
-                    value={refiip || "-"}
+                    value={roundMoney(refiip) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -545,7 +575,7 @@ const Inputs = ({ inputs, onChange }) => {
                 titleA={`Months ${cm > refi ? "faster" : "slower"}`}
                 valueA={
                   <NumberFormat
-                    value={Math.abs(cm - refi) || "-"}
+                    value={roundMoney(Math.abs(cm - refi)) || "-"}
                     displayType="text"
                   />
                 }
@@ -566,11 +596,16 @@ const Inputs = ({ inputs, onChange }) => {
               <TotalsBoxes
                 bigTitle="Current Mortgage w/ Add. Payment"
                 titleA="Remaining Months"
-                valueA={<NumberFormat value={cmwa || "-"} displayType="text" />}
+                valueA={
+                  <NumberFormat
+                    value={roundMoney(cmwa) || "-"}
+                    displayType="text"
+                  />
+                }
                 titleB="Total Interest"
                 valueB={
                   <NumberFormat
-                    value={cmwaip || "-"}
+                    value={roundMoney(cmwaip) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -587,12 +622,15 @@ const Inputs = ({ inputs, onChange }) => {
                 bigTitle="Refinance w/ Add. Payment"
                 titleA="Remaining Months"
                 valueA={
-                  <NumberFormat value={refiwa || "-"} displayType="text" />
+                  <NumberFormat
+                    value={roundMoney(refiwa) || "-"}
+                    displayType="text"
+                  />
                 }
                 titleB="Total Interest"
                 valueB={
                   <NumberFormat
-                    value={refiwaip || "-"}
+                    value={roundMoney(refiwaip) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
@@ -611,7 +649,7 @@ const Inputs = ({ inputs, onChange }) => {
                 titleA={`Months ${cmwa > refiwa ? "Faster" : "Slower"}`}
                 valueA={
                   <NumberFormat
-                    value={Math.abs(cmwa - refiwa) || "-"}
+                    value={roundMoney(Math.abs(cmwa - refiwa)) || "-"}
                     displayType="text"
                   />
                 }

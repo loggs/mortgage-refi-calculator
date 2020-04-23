@@ -64,18 +64,18 @@ const StyledAppBar = withStyles({
 })(AppBar);
 
 const defaultInputs = {
-  appraisal: "100000",
-  originalPrincipal: "100000",
-  originalRate: "4.5",
-  originalTerm: "360",
-  originalPMI: "1000",
-  currentPayment: "600",
-  currentBalance: "80000",
-  closingCosts: "10000",
-  newRate: "2.5",
-  newTerm: "360",
-  newPMI: "9000",
-  cashOut: "5000",
+  appraisal: null,
+  originalPrincipal: null,
+  originalRate: null,
+  originalTerm: null,
+  originalPMI: null,
+  currentPayment: null,
+  currentBalance: null,
+  closingCosts: null,
+  newRate: null,
+  newTerm: null,
+  newPMI: null,
+  cashOut: null,
 };
 
 const App = () => {
