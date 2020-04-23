@@ -93,7 +93,7 @@ const AmortizationTable = ({ inputs }) => {
   );
 
   return (
-    <Container>
+    <Container maxWidth={false}>
       <Paper square style={{ width: "100%" }}>
         <Tabs
           centered

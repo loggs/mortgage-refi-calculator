@@ -110,7 +110,7 @@ const App = () => {
           </Typography>
         </Toolbar>
       </StyledAppBar>
-      <Container className={classes.container}>
+      <Container maxWidth={false} className={classes.container}>
         <Tabs
           orientation="vertical"
           variant="scrollable"
