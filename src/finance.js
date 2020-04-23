@@ -95,3 +95,47 @@ export const generateAmortizationTable = (
 
   return table;
 };
+
+export const generateAllAmortizationTables = inputs => {
+  const cm = generateAmortizationTable(
+    toFloatSafe(inputs.appraisal),
+    toFloatSafe(inputs.currentBalance),
+    toFloatSafe(inputs.originalRate) / 100,
+    toFloatSafe(minimumPayment(inputs)),
+    toFloatSafe(inputs.originalPMI),
+    toFloatSafe(inputs.originalTerm),
+  );
+
+  const cmwa = generateAmortizationTable(
+    toFloatSafe(inputs.appraisal),
+    toFloatSafe(inputs.currentBalance),
+    toFloatSafe(inputs.originalRate) / 100,
+    toFloatSafe(inputs.currentPayment),
+    toFloatSafe(inputs.originalPMI),
+    toFloatSafe(inputs.originalTerm),
+  );
+
+  const np = newPrincipal(inputs);
+  const refimp = minimumPayment(inputs, true);
+  const refiwapmt = Math.max(refimp, toFloatSafe(inputs.currentPayment));
+
+  const refi = generateAmortizationTable(
+    toFloatSafe(inputs.appraisal),
+    toFloatSafe(np),
+    toFloatSafe(inputs.newRate) / 100,
+    toFloatSafe(refimp),
+    toFloatSafe(inputs.newPMI),
+    toFloatSafe(inputs.newTerm),
+  );
+
+  const refiwa = generateAmortizationTable(
+    toFloatSafe(inputs.appraisal),
+    toFloatSafe(np),
+    toFloatSafe(inputs.newRate) / 100,
+    toFloatSafe(refiwapmt),
+    toFloatSafe(inputs.newPMI),
+    toFloatSafe(inputs.newTerm),
+  );
+
+  return { cm, cmwa, refi, refiwa };
+};

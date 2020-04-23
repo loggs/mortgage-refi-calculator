@@ -18,6 +18,7 @@ import {
   minimumPayment,
   toFloatSafe,
   newPrincipal,
+  generateAllAmortizationTables,
 } from "./finance";
 
 const ExpansionPanel = withStyles({
@@ -51,6 +52,43 @@ const useStyles = makeStyles(theme => ({
     justifyContent: "center",
   },
 }));
+
+const calcPayback = inputs => {
+  const { cm, cmwa, refi, refiwa } = generateAllAmortizationTables(inputs);
+
+  const closing = toFloatSafe(inputs.closingCosts);
+
+  let refiDiff = 0;
+  let refiwaDiff = 0;
+
+  let refiMonths = 0;
+  let refiwaMonths = 0;
+
+  let cmi = 0;
+  let cmwai = 0;
+  let refii = 0;
+  let refiwai = 0;
+  const withDefault = (x, def) => (x || {}).interest || def;
+  for (let i = 0; i <= 360; i++) {
+    cmi = withDefault(cm[i], cmi);
+    cmwai = withDefault(cmwa[i], cmwai);
+    refii = withDefault(refi[i], refii);
+    refiwai = withDefault(refiwa[i], refiwai);
+
+    refiDiff = refiDiff + (cmi - refii);
+    refiwaDiff = refiwaDiff + (cmwai - refiwai);
+
+    if (refiDiff >= closing && refiMonths === 0) {
+      refiMonths = i + 1;
+    }
+
+    if (refiwaDiff >= closing && refiwaMonths === 0) {
+      refiwaMonths = i + 1;
+    }
+  }
+
+  return { refiMonths, refiwaMonths };
+};
 
 const MoneyFormat = props => {
   const { inputRef, onChange, ...other } = props;
@@ -167,8 +205,9 @@ const allNPER = inputs => {
     nper(parseFloat(inputs.newRate) / 1200, refimp - refiadj, -np),
   );
   // ReFi w/ Additional
+  const wapmt = Math.max(refimp, inputs.currentPayment);
   const refiwa = validREFI(
-    nper(parseFloat(inputs.newRate) / 1200, refimp - refiadj, -np),
+    nper(parseFloat(inputs.newRate) / 1200, wapmt - refiadj, -np),
   );
 
   return { cm, cmwa, refi, refiwa, cmmp, refimp, np };
@@ -301,8 +340,12 @@ const Inputs = ({ inputs, onChange }) => {
     inputs,
     remainingMonths,
   );
+
   const pp = Math.max(refimp, toFloatSafe(inputs.currentPayment));
   const classes = useStyles();
+
+  const { refiMonths, refiwaMonths } = calcPayback(inputs);
+
   return (
     <div>
       <ExpansionPanel
@@ -592,6 +635,7 @@ const Inputs = ({ inputs, onChange }) => {
             </Grid>
 
             <Grid item sm={4} />
+
             <Grid item sm={2}>
               <TotalsBoxes
                 bigTitle="Current Mortgage w/ Add. Payment"
@@ -653,13 +697,35 @@ const Inputs = ({ inputs, onChange }) => {
                     displayType="text"
                   />
                 }
-                titleB={`${cmwaip > refiip ? "Less" : "More"} Interest Paid`}
+                titleB={`${cmwaip > refiwaip ? "Less" : "More"} Interest Paid`}
                 valueB={
                   <NumberFormat
-                    value={Math.abs(roundMoney(cmwaip - refiip)) || "-"}
+                    value={Math.abs(roundMoney(cmwaip - refiwaip)) || "-"}
                     displayType="text"
                     thousandSeparator={true}
                     prefix="$ "
+                  />
+                }
+              />
+            </Grid>
+            <Grid item sm={1} />
+            <Grid item sm={3}>
+              <TotalsBoxes
+                bigTitle="Refi Payback Period"
+                titleA="Without Additional Payments"
+                valueA={
+                  <NumberFormat
+                    value={roundMoney(refiMonths) || "-"}
+                    displayType="text"
+                    suffix=" months"
+                  />
+                }
+                titleB="Including Additional Payments"
+                valueB={
+                  <NumberFormat
+                    value={roundMoney(refiwaMonths) || "-"}
+                    displayType="text"
+                    suffix=" months"
                   />
                 }
               />

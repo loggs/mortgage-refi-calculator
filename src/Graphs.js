@@ -18,6 +18,8 @@ import {
   generateAmortizationTable,
   toFloatSafe,
   minimumPayment,
+  generateAllAmortizationTables,
+  roundMoney,
 } from "./finance";
 
 const useStyles = makeStyles(theme => ({
@@ -28,50 +30,6 @@ const useStyles = makeStyles(theme => ({
     height: "77vh",
   },
 }));
-
-const generateAllAmortizationTables = inputs => {
-  const cm = generateAmortizationTable(
-    toFloatSafe(inputs.appraisal),
-    toFloatSafe(inputs.currentBalance),
-    toFloatSafe(inputs.originalRate) / 100,
-    toFloatSafe(minimumPayment(inputs)),
-    toFloatSafe(inputs.originalPMI),
-    toFloatSafe(inputs.originalTerm),
-  );
-
-  const cmwa = generateAmortizationTable(
-    toFloatSafe(inputs.appraisal),
-    toFloatSafe(inputs.currentBalance),
-    toFloatSafe(inputs.originalRate) / 100,
-    toFloatSafe(inputs.currentPayment),
-    toFloatSafe(inputs.originalPMI),
-    toFloatSafe(inputs.originalTerm),
-  );
-
-  const np = newPrincipal(inputs);
-  const refimp = minimumPayment(inputs, true);
-  const refiwapmt = Math.max(refimp, toFloatSafe(inputs.currentPayment));
-
-  const refi = generateAmortizationTable(
-    toFloatSafe(inputs.appraisal),
-    toFloatSafe(np),
-    toFloatSafe(inputs.newRate) / 100,
-    toFloatSafe(refimp),
-    toFloatSafe(inputs.newPMI),
-    toFloatSafe(inputs.newTerm),
-  );
-
-  const refiwa = generateAmortizationTable(
-    toFloatSafe(inputs.appraisal),
-    toFloatSafe(np),
-    toFloatSafe(inputs.newRate) / 100,
-    toFloatSafe(refiwapmt),
-    toFloatSafe(inputs.newPMI),
-    toFloatSafe(inputs.newTerm),
-  );
-
-  return { cm, cmwa, refi, refiwa };
-};
 
 const generateLineData = inputs => {
   let data = [];
@@ -87,10 +45,10 @@ const generateLineData = inputs => {
     let cmwai = cmwa[i] || {};
     let refii = refi[i] || {};
     let refiwai = refiwa[i] || {};
-    cmagg = cmagg + (cmi.interest || 0);
-    cmwaagg = cmwaagg + (cmwai.interest || 0);
-    refiagg = refiagg + (refii.interest || 0);
-    refiwaagg = refiwaagg + (refiwai.interest || 0);
+    cmagg = roundMoney(cmagg + (cmi.interest || 0));
+    cmwaagg = roundMoney(cmwaagg + (cmwai.interest || 0));
+    refiagg = roundMoney(refiagg + (refii.interest || 0));
+    refiwaagg = roundMoney(refiwaagg + (refiwai.interest || 0));
 
     let d = {
       month: i + 1,
@@ -117,11 +75,11 @@ const interestColumns = [
     key: "icmwa",
     stroke: "#82ca9d",
   },
-  { label: "Refinance", key: "irefi", stroke: "#8884d8" },
+  { label: "Refinance", key: "irefi", stroke: "red" },
   {
     label: "Refinance w/ Additional Payment",
     key: "irefiwa",
-    stroke: "#82ca9d",
+    stroke: "blue",
   },
 ];
 
@@ -132,11 +90,11 @@ const principalColumns = [
     key: "pcmwa",
     stroke: "#82ca9d",
   },
-  { label: "Refinance", key: "prefi", stroke: "#8884d8" },
+  { label: "Refinance", key: "prefi", stroke: "red" },
   {
     label: "Refinance w/ Additional Payment",
     key: "prefiwa",
-    stroke: "#82ca9d",
+    stroke: "blue",
   },
 ];
 
@@ -175,7 +133,6 @@ const Graphs = ({ inputs }) => {
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
           <YAxis />
-          <Tooltip />
           <Legend />
           {columns.map(c => (
             <Line
@@ -183,8 +140,10 @@ const Graphs = ({ inputs }) => {
               dataKey={c.key}
               stroke={c.stroke}
               name={c.label}
+              dot={false}
             />
           ))}
+          <Tooltip />
         </LineChart>
       </Paper>
     </Container>
