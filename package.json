@@ -8,19 +8,33 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
+    "axios": "^0.19.2",
+    "chalk": "^4.0.0",
+    "encoding": "^0.1.12",
+    "faunadb": "^2.13.1",
     "financejs": "^4.1.0",
+    "http-proxy-middleware": "^1.0.3",
+    "netlify-cli": "^2.48.0",
+    "node-fetch": "^3.0.0-beta.5",
+    "query-string": "^6.12.1",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-number-format": "^4.4.1",
-    "react-scripts": "3.4.1",
+    "react-scripts": "^3.4.1",
     "react-virtualized": "^9.21.2",
-    "recharts": "^1.8.5"
+    "recharts": "^1.8.5",
+    "uuid": "^7.0.3"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "npm-run-all --parallel start:app start:server",
+    "start:app": "npx react-scripts start",
+    "start:server": "netlify-lambda serve functions",
+    "build:server": "netlify-lambda build functions",
+    "build:app": "npx react-scripts build",
+    "build": "npm-run-all --parallel build:**",
+    "test": "npx react-scripts test",
+    "eject": "npx react-scripts eject",
+    "bootstrap": "node ./scripts/bootstrap.js"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -36,5 +50,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "netlify-lambda": "^1.6.3",
+    "npm-run-all": "^4.1.5"
   }
 }

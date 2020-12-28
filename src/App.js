@@ -1,4 +1,5 @@
 import React from "react";
+import axios from "axios";
 import { makeStyles, withStyles } from "@material-ui/core/styles";
 import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
@@ -9,6 +10,7 @@ import Container from "@material-ui/core/Container";
 import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
 import Box from "@material-ui/core/Box";
+import qs from "query-string";
 
 import Inputs from "./Inputs";
 import Graphs from "./Graphs";
@@ -65,6 +67,7 @@ const StyledAppBar = withStyles({
 
 const defaultInputs = {
   appraisal: null,
+  currentValue: null,
   originalPrincipal: null,
   originalRate: null,
   originalTerm: null,
@@ -72,10 +75,13 @@ const defaultInputs = {
   currentPayment: null,
   currentBalance: null,
   closingCosts: null,
+  rateDiscount: null,
+  monthlyEscrow: null,
   newRate: null,
   newTerm: null,
   newPMI: null,
   cashOut: null,
+  escrowRefund: null,
 };
 
 const App = () => {
@@ -89,6 +95,21 @@ const App = () => {
       [field]: e.target.value,
     });
   };
+
+  React.useEffect(() => {
+    const get = async () => {
+      try {
+        const { id } = qs.parse(window.location.search);
+        if (id.length > 0) {
+          const d = await axios.get(`/.netlify/functions/get/${id}`);
+          setInputs(d.data.data || defaultInputs);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    get();
+  }, []);
 
   const handleChange = (_event, newValue) => {
     setValue(newValue);

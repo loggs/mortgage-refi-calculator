@@ -1,4 +1,5 @@
 import React from "react";
+import axios from "axios";
 import Grid from "@material-ui/core/Grid";
 import TextField from "@material-ui/core/TextField";
 import { makeStyles, withStyles } from "@material-ui/core/styles";
@@ -6,10 +7,18 @@ import MuiExpansionPanel from "@material-ui/core/ExpansionPanel";
 import ExpansionPanelSummary from "@material-ui/core/ExpansionPanelSummary";
 import ExpansionPanelDetails from "@material-ui/core/ExpansionPanelDetails";
 import Typography from "@material-ui/core/Typography";
+import Button from "@material-ui/core/Button";
 import Card from "@material-ui/core/Card";
+import Dialog from "@material-ui/core/Dialog";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogActions from "@material-ui/core/DialogActions";
+import Paper from "@material-ui/core/Paper";
+import SnackBar from "@material-ui/core/SnackBar";
 import CardContent from "@material-ui/core/CardContent";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import ArrowForwardIcon from "@material-ui/icons/ArrowForward";
+import ShareIcon from "@material-ui/icons/Share";
 import NumberFormat from "react-number-format";
 import {
   cumulativeInterest,
@@ -133,20 +142,22 @@ const PercentFormat = props => {
   );
 };
 
-const DefaultInput = props => {
-  const customInputs = props.percent
+const DefaultInput = ({ percent, money, placeholder, value, ...other }) => {
+  const customInputs = percent
     ? { inputComponent: PercentFormat }
-    : props.money
+    : money
     ? { inputComponent: MoneyFormat }
     : null;
-  const hold = props.percent ? "0%" : props.money ? "$0" : props.placeholder;
+  const hold = percent ? "0%" : money ? "$0" : placeholder;
   return (
     <TextField
       placeholder={hold}
       variant="outlined"
       InputProps={customInputs}
       size="small"
-      {...props}
+      value={value || ""}
+      style={{ width: "100%" }}
+      {...other}
     />
   );
 };
@@ -326,6 +337,26 @@ const Inputs = ({ inputs, onChange }) => {
     totals: true,
   });
 
+  const [shareId, setShareId] = React.useState(null);
+  const [copied, setCopied] = React.useState(false);
+
+  const handleSnackBarClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setCopied(false);
+  };
+
+  const onSave = async () => {
+    try {
+      const response = await axios.post("/.netlify/functions/save", inputs);
+      setShareId(response.data.ref["@ref"].id);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   const togglePanel = panel => (_event, isExpanded) => {
     setPanels({
       ...panels,
@@ -348,6 +379,49 @@ const Inputs = ({ inputs, onChange }) => {
 
   return (
     <div>
+      <SnackBar
+        anchorOrigin={{
+          vertical: "top",
+          horizontal: "left",
+        }}
+        open={copied}
+        autoHideDuration={2000}
+        onClose={handleSnackBarClose}
+        message="Copied to clipboard!"
+      />
+
+      <Dialog
+        onClose={() => setShareId(null)}
+        open={Boolean(shareId)}
+        maxWidth="sm"
+        fullWidth={true}>
+        <Paper>
+          <DialogTitle>Custom URL</DialogTitle>
+          <DialogContent
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+            <StyledInput
+              style={{ width: "80%" }}
+              variant="outlined"
+              value={`${window.location.href}?id=${shareId}`}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `${window.location.href}?id=${shareId}`,
+                );
+                setCopied(true);
+              }}>
+              Copy
+            </Button>
+          </DialogActions>
+        </Paper>
+      </Dialog>
       <ExpansionPanel
         expanded={panels.original}
         onChange={togglePanel("original")}>
@@ -365,7 +439,15 @@ const Inputs = ({ inputs, onChange }) => {
               <StyledInput
                 value={inputs.appraisal}
                 onChange={onChange("appraisal")}
-                label="Appraisal"
+                label="Purchase Price"
+                money={1}
+              />
+            </Grid>
+            <Grid item sm={2}>
+              <StyledInput
+                value={inputs.appraisal}
+                onChange={onChange("currentValue")}
+                label="Current Value"
                 money={1}
               />
             </Grid>
@@ -392,6 +474,7 @@ const Inputs = ({ inputs, onChange }) => {
                 label="Term (months)"
               />
             </Grid>
+            <Grid item sm={2} />
             <Grid item sm={2}>
               <StyledInput
                 value={inputs.originalPMI}
@@ -401,12 +484,11 @@ const Inputs = ({ inputs, onChange }) => {
               />
             </Grid>
 
-            <Grid item sm={2} />
             <Grid item sm={2}>
               <StyledInput
                 value={inputs.currentPayment}
                 onChange={onChange("currentPayment")}
-                label="Current Payment"
+                label="Current P+I"
                 money={1}
               />
             </Grid>
@@ -418,10 +500,20 @@ const Inputs = ({ inputs, onChange }) => {
                 money={1}
               />
             </Grid>
-            <Grid item sm={8} />
+
+            <Grid item sm={2}>
+              <StyledInput
+                value={inputs.monthlyEscrow}
+                onChange={onChange("monthlyEscrow")}
+                label="Monthly Escrow"
+                money={1}
+              />
+            </Grid>
+
+            <Grid item sm={4} />
             <Grid item sm={2}>
               <CalculatedNumber
-                title="Minimum Payment"
+                title="Existing Minimum P+I Payment"
                 value={
                   <NumberFormat
                     value={roundMoney(cmmp) || "-"}
@@ -434,7 +526,7 @@ const Inputs = ({ inputs, onChange }) => {
             </Grid>
             <Grid item sm={2}>
               <CalculatedNumber
-                title="Additional Payment"
+                title="Monthly P+I Add. Payment"
                 value={
                   <NumberFormat
                     value={roundMoney(inputs.currentPayment - cmmp) || "-"}
@@ -494,14 +586,25 @@ const Inputs = ({ inputs, onChange }) => {
               <StyledInput
                 value={inputs.cashOut}
                 onChange={onChange("cashOut")}
-                label="Cash Out"
+                label={`Cash ${
+                  parseFloat(inputs.cashOut) < 0 ? "From" : "To"
+                } Borrower`}
                 money={1}
               />
             </Grid>
-            <Grid item sm={2} />
+
+            <Grid item sm={2}>
+              <StyledInput
+                value={inputs.escrowRefund}
+                onChange={onChange("escrowRefund")}
+                label="Escrow Refund"
+                money={1}
+              />
+            </Grid>
+
             <Grid item sm={2}>
               <CalculatedNumber
-                title="New Principal"
+                title="New Loan Amount"
                 value={
                   <NumberFormat
                     value={roundMoney(np) || "-"}
@@ -514,7 +617,7 @@ const Inputs = ({ inputs, onChange }) => {
             </Grid>
             <Grid item sm={2}>
               <CalculatedNumber
-                title="Minimum Payment"
+                title="New Monthly P+I Payment"
                 value={
                   <NumberFormat
                     value={roundMoney(refimp) || "-"}
@@ -527,20 +630,7 @@ const Inputs = ({ inputs, onChange }) => {
             </Grid>
             <Grid item sm={2}>
               <CalculatedNumber
-                title="Planned Payment"
-                value={
-                  <NumberFormat
-                    value={roundMoney(pp) || "-"}
-                    displayType="text"
-                    thousandSeparator={true}
-                    prefix="$ "
-                  />
-                }
-              />
-            </Grid>
-            <Grid item sm={2}>
-              <CalculatedNumber
-                title="Additional Payment"
+                title="Monthly P+I Add. Payment"
                 value={
                   <NumberFormat
                     value={roundMoney(pp - refimp) || "-"}
@@ -559,6 +649,19 @@ const Inputs = ({ inputs, onChange }) => {
           aria-controls="panel2a-content"
           id="panel2a-header">
           <Typography className={classes.heading}>Calculations</Typography>
+          <Button
+            onClick={onSave}
+            size="small"
+            variant="outlined"
+            style={{
+              padding: 0,
+              marginLeft: "20px",
+              paddingRight: "5px",
+              paddingLeft: "5px",
+            }}>
+            <ShareIcon fontSize="small" style={{ marginRight: "5px" }} />
+            Share
+          </Button>
         </ExpansionPanelSummary>
         <ExpansionPanelDetails>
           <Grid container spacing={2}>
@@ -663,7 +766,7 @@ const Inputs = ({ inputs, onChange }) => {
             </Grid>
             <Grid item sm={2}>
               <TotalsBoxes
-                bigTitle="Refinance w/ Add. Payment"
+                bigTitle="Refinance w/ Current P+I Payment"
                 titleA="Remaining Months"
                 valueA={
                   <NumberFormat
@@ -711,19 +814,11 @@ const Inputs = ({ inputs, onChange }) => {
             <Grid item sm={1} />
             <Grid item sm={3}>
               <TotalsBoxes
-                bigTitle="Refi Payback Period"
-                titleA="Without Additional Payments"
+                bigTitle="Recoupment Period"
+                titleA="For Closing Costs/Rate Discount"
                 valueA={
                   <NumberFormat
                     value={roundMoney(refiMonths) || "-"}
-                    displayType="text"
-                    suffix=" months"
-                  />
-                }
-                titleB="Including Additional Payments"
-                valueB={
-                  <NumberFormat
-                    value={roundMoney(refiwaMonths) || "-"}
                     displayType="text"
                     suffix=" months"
                   />
